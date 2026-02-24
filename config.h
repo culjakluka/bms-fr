@@ -22,7 +22,7 @@
 /* Power limiting (Feature 2) */
 #define POWER_LIMIT_MAX_W         5000
 #define POWER_LIMIT_MIN_W         500
-#define SOC_PERCENT_RAMP_START    15.0f
+#define MAX_DISCHARGE_TIME_S      3600   /* base limit = capacity_Wh * 3600 / this */
 
 /* CAN (Feature 4) */
 #define CAN_TX_ID                 0x100
