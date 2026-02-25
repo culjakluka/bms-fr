@@ -22,6 +22,7 @@ uint16_t power_request_w = 0;
 uint16_t power_limit_w;
 unsigned long last_ms = 0;
 unsigned long last_tx_ms = 0;
+unsigned long last_watchgod_rs_ms = 0;
 bool button_prev = HIGH;
 
 /* Za CAN TX (kasnije Feature 5 će postavljati) */
@@ -53,6 +54,8 @@ void setup() {
 
   last_ms = millis();
   last_tx_ms = last_ms;
+  last_watchdog_rs_ms = last_ms;
+
   Serial.println(F("BMS Master"));
 }
 
@@ -72,10 +75,20 @@ void loop() {
   }
   button_prev = btn;
 
-  /* CAN RX: power request (low byte, high byte) */
+  /* Feature 6: CAN Watchdog for VCU msgs */
+
+  // Read all CAN msg and check if its from VCU
   struct can_frame rx;
-  if (can.readMessage(&rx) == MCP2515::ERROR_OK && rx.can_id == CAN_RX_ID) {
-    power_request_w = decodeBytes(rx.data[4], rx.data[5]);
+  while (can.readMessage(&rx) == MCP2515::ERROR_OK) {
+    if (rx.can_id == CAN_RX_ID) {
+      power_request_w = decodeBytes(rx.data[4], rx.data[5]);
+      last_watchdog_rs_ms = now;
+    }
+  }
+
+  // Timeout check
+  if (now - last_watchdog_rs_ms > CAN_WATCHDOG_MS) {
+    state = BMS_STATE_ERROR;
   }
 
   /* Feature 1: baterija (samo u READY se prazni) */
@@ -87,6 +100,7 @@ void loop() {
   /* Feature 2: power limit (capacity, request, rate check za 1 s) */
   power_limit_update(battery_get_current_wh(), power_request_w);
   power_limit_w = power_limit_get_w();
+
 
   /* CAN TX @ 10 Hz */
   if (now - last_tx_ms >= CAN_TX_INTERVAL_MS) {
