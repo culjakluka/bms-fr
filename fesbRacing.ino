@@ -67,13 +67,19 @@ void loop() {
   /* State machine: gumb */
   bool btn = (digitalRead(PIN_BUTTON) == HIGH);
   if (!btn && button_prev) {
+
     if (state == BMS_STATE_IDLE) {
       state = BMS_STATE_READY;
-    } else if (state == BMS_STATE_ERROR) {
-      state = BMS_STATE_IDLE;
+    } 
+    else if (state == BMS_STATE_ERROR) {
+      /* Exit ERROR state if VCU is sending again */
+      if (now - last_watchdog_rs_ms <= CAN_WATCHDOG_MS) {
+        state = BMS_STATE_IDLE;
+      }
     }
   }
   button_prev = btn;
+
 
   /* Feature 6: CAN Watchdog for VCU msgs */
 
