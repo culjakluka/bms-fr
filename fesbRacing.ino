@@ -11,14 +11,15 @@
 #include <mcp2515.h>
 #include "config.h"
 #include "feature1_battery.h"
+#include "feature2_power.h"
 
-/* --- Hardware --- */
+/* Hardware */
 MCP2515 can(PIN_CAN_CS);
 
-/* --- Stanje (glavni file) --- */
+/* Stanje (glavni file) */
 uint8_t state = BMS_STATE_IDLE;
 uint16_t power_request_w = 0;
-uint16_t power_limit_w = POWER_LIMIT_MAX_W;
+uint16_t power_limit_w;
 unsigned long last_ms = 0;
 unsigned long last_tx_ms = 0;
 bool button_prev = HIGH;
@@ -34,6 +35,7 @@ void setup() {
   button_prev = (digitalRead(PIN_BUTTON) == HIGH);
 
   battery_init();
+  power_limit_init();
 
   can.reset();
   can.setBitrate(CAN_500KBPS, MCP_16MHZ);
@@ -72,8 +74,9 @@ void loop() {
     state = BMS_STATE_ERROR;
   }
 
-  /* Feature 2: power limit (TODO – za sada fiksno) */
-  power_limit_w = POWER_LIMIT_MAX_W;
+  /* Feature 2: power limit (capacity, request, rate check za 1 s) */
+  power_limit_update(battery_get_current_wh(), power_request_w);
+  power_limit_w = power_limit_get_w();
 
   /* CAN TX @ 10 Hz */
   if (now - last_tx_ms >= CAN_TX_INTERVAL_MS) {
