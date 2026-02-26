@@ -5,7 +5,7 @@
  * Ovdje je samo: init, petlja, CAN, state machine, pozivi u feature module.
  * Logika baterije -> feature1_battery.h
  * Konstante -> config.h
- */
+*/
 
 #include <SPI.h>
 #include <mcp2515.h>
@@ -27,6 +27,16 @@ bool button_prev = HIGH;
 
 /* Feature 5 */
 float pack_voltage_v, pack_current_a, pack_temp_c;
+
+/* Konvencija VCU */
+uint16_t decodeBytes(uint8_t lowByte, uint8_t highByte) {
+  return ((uint16_t)highByte << 8) | lowByte;
+}
+
+void encodeBytes(uint16_t value, uint8_t &lowByte, uint8_t &highByte) {
+  lowByte  = value & 0xFF;
+  highByte = (value >> 8) & 0xFF;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -65,10 +75,10 @@ void loop() {
   }
   button_prev = btn;
 
-  /* CAN RX: power request */
+  /* CAN RX: power request (low byte, high byte) */
   struct can_frame rx;
   if (can.readMessage(&rx) == MCP2515::ERROR_OK && rx.can_id == CAN_RX_ID) {
-    power_request_w = (uint16_t)((rx.data[4] << 8) | rx.data[5]);
+    power_request_w = decodeBytes(rx.data[4], rx.data[5]);
   }
 
   /* Feature 1: baterija (samo u READY se prazni) */
@@ -108,12 +118,9 @@ void send_can_bms(void) {
   uint16_t volt = (uint16_t)(pack_voltage_v * 10.0f);
 
   tx.data[0] = state;
-  tx.data[1] = (soc >> 8) & 0xFF;
-  tx.data[2] = soc & 0xFF;
-  tx.data[3] = (power_limit_w >> 8) & 0xFF;
-  tx.data[4] = power_limit_w & 0xFF;
-  tx.data[5] = (volt >> 8) & 0xFF;
-  tx.data[6] = volt & 0xFF;
+  encodeBytes(soc, tx.data[1], tx.data[2]);
+  encodeBytes(power_limit_w, tx.data[3], tx.data[4]);
+  encodeBytes(volt, tx.data[5], tx.data[6]);
   tx.data[7] = pack_temp_c;
 
   can.sendMessage(&tx);
