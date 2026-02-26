@@ -12,6 +12,7 @@
 #include "config.h"
 #include "feature1_battery.h"
 #include "feature2_power.h"
+#include "feature5_simulation.h"
 
 /* Hardware */
 MCP2515 can(PIN_CAN_CS);
@@ -24,14 +25,16 @@ unsigned long last_ms = 0;
 unsigned long last_tx_ms = 0;
 bool button_prev = HIGH;
 
-/* Za CAN TX (kasnije Feature 5 će postavljati) */
-float pack_voltage_v = 12.0f;
-uint8_t pack_temp_c = PACK_TEMP_DEFAULT_C;
+/* Feature 5 */
+float pack_voltage_v, pack_current_a, pack_temp_c;
 
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_VOLTAGE_POT, INPUT);
+  pinMode(PIN_CURRENT_POT, INPUT);
+  pinMode(PIN_TEMP_POT, INPUT);
   button_prev = (digitalRead(PIN_BUTTON) == HIGH);
 
   battery_init();
@@ -78,6 +81,15 @@ void loop() {
   power_limit_update(battery_get_current_wh(), power_request_w);
   power_limit_w = power_limit_get_w();
 
+  /*Feature 5: sensor simulation*/
+  pack_voltage_v = analogRead(PIN_VOLTAGE_POT) * (SENSOR_VOLTAGE_MAX / ADC_MAX);
+  pack_current_a = analogRead(PIN_CURRENT_POT) * (SENSOR_CURRENT_MAX / ADC_MAX);
+  pack_temp_c = (uint8_t)(analogRead(PIN_TEMP_POT) * (SENSOR_TEMP_MAX / ADC_MAX));
+
+  if(!(check_ranges(pack_voltage_v,pack_current_a,pack_temp_c))){
+    state = BMS_STATE_ERROR;
+  }
+  
   /* CAN TX @ 10 Hz */
   if (now - last_tx_ms >= CAN_TX_INTERVAL_MS) {
     send_can_bms();
