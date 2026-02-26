@@ -5,7 +5,7 @@
  * Ovdje je samo: init, petlja, CAN, state machine, pozivi u feature module.
  * Logika baterije -> feature1_battery.h
  * Konstante -> config.h
- */
+*/
 
 #include <SPI.h>
 #include <mcp2515.h>
@@ -13,6 +13,7 @@
 #include "feature1_battery.h"
 #include "feature2_power.h"
 #include "feature3_state_machine.h"
+#include "feature5_simulation.h"
 
 /* Hardware */
 MCP2515 can(PIN_CAN_CS);
@@ -22,16 +23,29 @@ uint16_t power_request_w = 0;
 uint16_t power_limit_w;
 unsigned long last_ms = 0;
 unsigned long last_tx_ms = 0;
+unsigned long last_watchgod_rs_ms = 0;
 bool button_prev = HIGH;
 
-/* Za CAN TX (kasnije Feature 5 će postavljati) */
-float pack_voltage_v = 12.0f;
-uint8_t pack_temp_c = PACK_TEMP_DEFAULT_C;
+/* Feature 5 */
+float pack_voltage_v, pack_current_a, pack_temp_c;
+
+/* Konvencija VCU */
+uint16_t decodeBytes(uint8_t lowByte, uint8_t highByte) {
+  return ((uint16_t)highByte << 8) | lowByte;
+}
+
+void encodeBytes(uint16_t value, uint8_t &lowByte, uint8_t &highByte) {
+  lowByte  = value & 0xFF;
+  highByte = (value >> 8) & 0xFF;
+}
 
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_VOLTAGE_POT, INPUT);
+  pinMode(PIN_CURRENT_POT, INPUT);
+  pinMode(PIN_TEMP_POT, INPUT);
   button_prev = (digitalRead(PIN_BUTTON) == HIGH);
 
   battery_init();
@@ -43,6 +57,8 @@ void setup() {
 
   last_ms = millis();
   last_tx_ms = last_ms;
+  last_watchdog_rs_ms = last_ms;
+
   Serial.println(F("BMS Master"));
 }
 
@@ -62,10 +78,21 @@ void loop() {
   }
   button_prev = btn;
 
-  /* CAN RX: power request */
+
+  /* Feature 6: CAN Watchdog for VCU msgs */
+
+  // Read all CAN msg and check if its from VCU
   struct can_frame rx;
-  if (can.readMessage(&rx) == MCP2515::ERROR_OK && rx.can_id == CAN_RX_ID) {
-    power_request_w = (uint16_t)((rx.data[4] << 8) | rx.data[5]);
+  while (can.readMessage(&rx) == MCP2515::ERROR_OK) {
+    if (rx.can_id == CAN_RX_ID) {
+      power_request_w = decodeBytes(rx.data[4], rx.data[5]);
+      last_watchdog_rs_ms = now;
+    }
+  }
+
+  // Timeout check
+  if (now - last_watchdog_rs_ms > CAN_WATCHDOG_MS) {
+    state = BMS_STATE_ERROR;
   }
 
   /* Feature 1: baterija (samo u READY se prazni) */
@@ -78,6 +105,15 @@ void loop() {
   power_limit_update(battery_get_current_wh(), power_request_w);
   power_limit_w = power_limit_get_w();
 
+  /*Feature 5: sensor simulation*/
+  pack_voltage_v = analogRead(PIN_VOLTAGE_POT) * (SENSOR_VOLTAGE_MAX / ADC_MAX);
+  pack_current_a = analogRead(PIN_CURRENT_POT) * (SENSOR_CURRENT_MAX / ADC_MAX);
+  pack_temp_c = (uint8_t)(analogRead(PIN_TEMP_POT) * (SENSOR_TEMP_MAX / ADC_MAX));
+
+  if(!(check_ranges(pack_voltage_v,pack_current_a,pack_temp_c))){
+    state = BMS_STATE_ERROR;
+  }
+  
   /* CAN TX @ 10 Hz */
   if (now - last_tx_ms >= CAN_TX_INTERVAL_MS) {
     send_can_bms();
@@ -96,12 +132,9 @@ void send_can_bms(void) {
   uint16_t volt = (uint16_t)(pack_voltage_v * 10.0f);
 
   tx.data[0] = BMS_get_state();
-  tx.data[1] = (soc >> 8) & 0xFF;
-  tx.data[2] = soc & 0xFF;
-  tx.data[3] = (power_limit_w >> 8) & 0xFF;
-  tx.data[4] = power_limit_w & 0xFF;
-  tx.data[5] = (volt >> 8) & 0xFF;
-  tx.data[6] = volt & 0xFF;
+  encodeBytes(soc, tx.data[1], tx.data[2]);
+  encodeBytes(power_limit_w, tx.data[3], tx.data[4]);
+  encodeBytes(volt, tx.data[5], tx.data[6]);
   tx.data[7] = pack_temp_c;
 
   can.sendMessage(&tx);
