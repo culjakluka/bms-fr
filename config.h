@@ -28,7 +28,9 @@
 #define CAN_TX_ID                 0x100
 #define CAN_RX_ID                 0x200
 #define CAN_TX_INTERVAL_MS        100
-#define CAN_HEARTBEAT_TIMEOUT_MS  50
+
+/* CAN Watchdog (Feature 6) */
+#define CAN_WATCHDOG_MS  50
 
 /* Timing */
 #define MS_PER_SECOND             1000
