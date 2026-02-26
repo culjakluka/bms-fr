@@ -46,7 +46,7 @@
 #define ADC_VREF_V                5.0f
 
 /* Pinovi */
-#define PIN_BUTTON                2
+#define PIN_BUTTON                4
 #define PIN_LED                   3
 #define PIN_CAN_CS                10
 #define PIN_CAN_INT               9
