@@ -34,6 +34,9 @@
 #define MS_PER_SECOND             1000
 
 /* Senzori (Feature 5) – rasponi */
+#define SENSOR_VOLTAGE_MAX        20.0f
+#define SENSOR_CURRENT_MAX        100.0f
+#define SENSOR_TEMP_MAX           100
 #define PACK_VOLTAGE_MIN_V        10.0f
 #define PACK_VOLTAGE_MAX_V        15.0f
 #define PACK_CURRENT_MIN_A        0.0f
@@ -41,7 +44,8 @@
 #define PACK_TEMP_MIN_C           0.0f
 #define PACK_TEMP_MAX_C           60.0f
 #define PACK_TEMP_DEFAULT_C       25
-#define ADC_MAX                   1023
+#define ADC_MIN                   0
+#define ADC_MAX                   1023.0f
 #define ADC_VREF_V                5.0f
 
 /* Pinovi */
@@ -49,5 +53,8 @@
 #define PIN_LED                   3
 #define PIN_CAN_CS                10
 #define PIN_CAN_INT               9
+#define PIN_VOLTAGE_POT           A3
+#define PIN_CURRENT_POT           A4
+#define PIN_TEMP_POT              A5
 
 #endif
