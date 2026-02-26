@@ -12,12 +12,12 @@
 #include "config.h"
 #include "feature1_battery.h"
 #include "feature2_power.h"
+#include "feature3_state_machine.h"
 
 /* Hardware */
 MCP2515 can(PIN_CAN_CS);
 
 /* Stanje (glavni file) */
-uint8_t state = BMS_STATE_IDLE;
 uint16_t power_request_w = 0;
 uint16_t power_limit_w;
 unsigned long last_ms = 0;
@@ -54,10 +54,10 @@ void loop() {
   /* State machine: gumb */
   bool btn = (digitalRead(PIN_BUTTON) == HIGH);
   if (!btn && button_prev) {
-    if (state == BMS_STATE_IDLE) {
-      state = BMS_STATE_READY;
-    } else if (state == BMS_STATE_ERROR) {
-      state = BMS_STATE_IDLE;
+    if (BMS_get_state() == BMS_STATE_IDLE) {
+      BMS_set_ready_state();
+    } else if (BMS_get_state() == BMS_STATE_ERROR) {
+      BMS_set_idle_state();
     }
   }
   button_prev = btn;
@@ -69,9 +69,9 @@ void loop() {
   }
 
   /* Feature 1: baterija (samo u READY se prazni) */
-  battery_update(dt_s, power_request_w, (state == BMS_STATE_READY));
-  if (state == BMS_STATE_READY && battery_is_empty()) {
-    state = BMS_STATE_ERROR;
+  battery_update(dt_s, power_request_w, (BMS_get_state() == BMS_STATE_READY));
+  if (BMS_get_state() == BMS_STATE_READY && battery_is_empty()) {
+    BMS_force_error_state();
   }
 
   /* Feature 2: power limit (capacity, request, rate check za 1 s) */
@@ -84,7 +84,7 @@ void loop() {
     last_tx_ms = now;
   }
 
-  digitalWrite(PIN_LED, (state == BMS_STATE_READY) ? HIGH : LOW);
+  digitalWrite(PIN_LED, (BMS_get_state() == BMS_STATE_READY) ? HIGH : LOW);
 }
 
 void send_can_bms(void) {
@@ -95,7 +95,7 @@ void send_can_bms(void) {
   uint16_t soc = (uint16_t)(battery_get_soc_pct() * 10.0f);
   uint16_t volt = (uint16_t)(pack_voltage_v * 10.0f);
 
-  tx.data[0] = state;
+  tx.data[0] = BMS_get_state();
   tx.data[1] = (soc >> 8) & 0xFF;
   tx.data[2] = soc & 0xFF;
   tx.data[3] = (power_limit_w >> 8) & 0xFF;

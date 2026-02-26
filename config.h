@@ -14,11 +14,6 @@
 #define SECONDS_PER_HOUR          3600.0f
 #define PERCENT_SCALE             100.0f
 
-/* Stanja BMS-a */
-#define BMS_STATE_IDLE            0
-#define BMS_STATE_READY            1
-#define BMS_STATE_ERROR            2
-
 /* Power limiting (Feature 2) */
 #define POWER_LIMIT_MAX_W         5000
 #define POWER_LIMIT_MIN_W         500
