@@ -52,7 +52,7 @@ void setup() {
   power_limit_init();
 
   can.reset();
-  can.setBitrate(CAN_500KBPS, MCP_16MHZ);
+  can.setBitrate(CAN_500KBPS, MCP_8MHZ);
   can.setNormalMode();
 
   last_ms = millis();
