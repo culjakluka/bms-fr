@@ -101,6 +101,12 @@ void loop() {
     BMS_force_error_state();
   }
 
+  /* Feature 1: baterija (samo u READY se prazni) */
+  battery_update(dt_s, power_request_w, (BMS_get_state() == BMS_STATE_READY));
+  if (BMS_get_state() == BMS_STATE_READY && battery_is_empty()) {
+    BMS_force_error_state();
+  }
+
   /* Feature 2: power limit (capacity, request, rate check za 1 s) */
   power_limit_update(battery_get_current_wh(), power_request_w);
   power_limit_w = power_limit_get_w();
