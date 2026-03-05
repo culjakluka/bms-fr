@@ -23,7 +23,7 @@ uint16_t power_request_w = 0;
 uint16_t power_limit_w;
 unsigned long last_ms = 0;
 unsigned long last_tx_ms = 0;
-unsigned long last_watchgod_rs_ms = 0;
+unsigned long last_watchdog_rs_ms = 0;
 bool button_prev = HIGH;
 
 /* Feature 5 */
@@ -40,7 +40,7 @@ void encodeBytes(uint16_t value, uint8_t &lowByte, uint8_t &highByte) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   pinMode(PIN_LED, OUTPUT);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_VOLTAGE_POT, INPUT);
@@ -92,7 +92,13 @@ void loop() {
 
   // Timeout check
   if (now - last_watchdog_rs_ms > CAN_WATCHDOG_MS) {
-    state = BMS_STATE_ERROR;
+    BMS_force_error_state();
+  }
+
+  /* Feature 1: baterija (samo u READY se prazni) */
+  battery_update(dt_s, power_request_w, (BMS_get_state() == BMS_STATE_READY));
+  if (BMS_get_state() == BMS_STATE_READY && battery_is_empty()) {
+    BMS_force_error_state();
   }
 
   /* Feature 1: baterija (samo u READY se prazni) */
@@ -111,7 +117,7 @@ void loop() {
   pack_temp_c = (uint8_t)(analogRead(PIN_TEMP_POT) * (SENSOR_TEMP_MAX / ADC_MAX));
 
   if(!(check_ranges(pack_voltage_v,pack_current_a,pack_temp_c))){
-    state = BMS_STATE_ERROR;
+    BMS_force_error_state();
   }
   
   /* CAN TX @ 10 Hz */
@@ -119,7 +125,18 @@ void loop() {
     send_can_bms();
     last_tx_ms = now;
   }
-
+  
+  Serial.print(pack_voltage_v);
+  Serial.print(" ");
+  Serial.print(pack_current_a);
+  Serial.print(" ");
+  Serial.print(pack_temp_c);
+  Serial.print(" ");
+  Serial.print(battery_get_current_wh());
+  Serial.print(" ");
+  Serial.print(battery_get_soc_pct());
+  Serial.print(" ");
+  Serial.println(BMS_get_state_name());
   digitalWrite(PIN_LED, (BMS_get_state() == BMS_STATE_READY) ? HIGH : LOW);
 }
 

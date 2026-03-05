@@ -9,7 +9,7 @@
 /* Baterija (Feature 1) */
 #define SOC_PERCENT_MIN           0
 #define SOC_PERCENT_MAX           100
-#define SOC_INITIAL_PERCENT       80
+#define SOC_INITIAL_PERCENT       0.5f
 #define TOTAL_CAPACITY_WH         2000.0f
 #define SECONDS_PER_HOUR          3600.0f
 #define PERCENT_SCALE             100.0f
